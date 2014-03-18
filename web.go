@@ -36,9 +36,9 @@ func main() {
     fmt.Println("listening...")
     err := http.ListenAndServe(":"+os.Getenv("PORT"), nil)
     //err2 := http.ListenAndServe(":9999", nil)
-    /*if err2 != nil {
-      panic(err2)
-    }*/
+    if err != nil {
+      panic(err)
+    }
 }
 
 func hello(res http.ResponseWriter, req *http.Request) {
