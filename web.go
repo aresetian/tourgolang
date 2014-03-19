@@ -23,7 +23,7 @@ func main() {
 
 func hello(res http.ResponseWriter, req *http.Request) {
     fmt.Fprintln(res, "Benchmark Innova4j en la nueva app")
-    template.Print()
+    template.Print(res)
     fmt.Fprintln(res, concurrency.Exercise65())
     fmt.Fprintln(res, "fin test")
 }
