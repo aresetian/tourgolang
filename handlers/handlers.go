@@ -47,7 +47,7 @@ func ServerFunc(dir string) (err error) {
 // Nota (no hacer esto(Desactivar la proteccion XSS en IE/Chrome) ) . la  proteccion de XSS para estos navegadores se raeliza para poder ejecutar el ejemplo.
 func disableXSSProtection(function func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
     // retorna un clousore wrapper del response con la adicion de la cabeceza
-	return func(w http.ResponseWriter, r *http.Reques) {
+	return func(w http.ResponseWriter, r *http.Request) {
 	    // la cabecera X-XSS-Protection no solociona todos los casos de XSS pero si algunos, para este caso se desactiva para poder hacer el ejemplo adecuadamente
 	    // y ver como GOLANG al identificar estos posibles valores de ataque los transforma en valores seguros.
 		w.Header().Set("X-XSS-Protection", "0")
