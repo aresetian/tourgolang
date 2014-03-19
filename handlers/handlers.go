@@ -1,5 +1,5 @@
 package handlers
- 
+
 import (
 	"fmt"
 	"html/template"
@@ -8,8 +8,9 @@ import (
 	"os"
 	"path/filepath"
 )
- 
-// our user context input type
+
+// Estructura donde se almacenar-n los valores de ingresados por el usuario, de esta estructura una vez este completa la plantilla 
+// form_results.html tomar- los valores para mostrarlos en pantalla.
 type UserContextInput struct {
 	Tag              string
 	Script           string
@@ -20,15 +21,85 @@ type UserContextInput struct {
 	AttributeOnEvent string
 	AttributeSrc     string
 }
+
+// variable al alcance del paquete para mantener el camino de las plantillas
+var templates string
+
+/*
+ * Se crean los manejadores de las URl que va a tener en el proyecto, para este caso son dos / y /display
+ */
+func ServerFunc(dir string) (err error) {
+	// Se asigna las ruta donde estan las platillas
+	templates = dir
+    // os.Stat(templates) : verifica que las rutas de las plantillas indicadas en la variable templates, se enceuntra en el disco
+    // duro y que son rutas validas, en caso de no encontrar alguna ruta retornar- un *PathError y se imprimir- templates path is incorrect!
+	if _, err := os.Stat(templates); err != nil {
+		return fmt.Errorf("templates path is incorrect!")
+	}
+	// Mapea  / a la funci-n rootHandler, y se adiciona un filtro antes del llamado a rootHandler con la funci-n disableXSSProtection
+	http.HandleFunc("/", disableXSSProtection(rootHandler))
+	// Mapea  /display a la funci-n postHandler  y se adiciona un filtro antes del llamado a rootHandler con la funci-n disableXSSProtection
+	http.HandleFunc("/display", disableXSSProtection(postHandler))
+	// retorna nil en caso de no encontrar ningun error
+	return nil
+}
+
+// Nota (no hacer esto(Desactivar la proteccion XSS en IE/Chrome) ) . la  proteccion de XSS para estos navegadores se raeliza para poder ejecutar el ejemplo.
+func disableXSSProtection(function func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
+    // retorna un clousore wrapper del response con la adicion de la cabeceza
+	return func(w http.ResponseWriter, r *http.Reques) {
+	    // la cabecera X-XSS-Protection no solociona todos los casos de XSS pero si algunos, para este caso se desactiva para poder hacer el ejemplo adecuadamente
+	    // y ver como GOLANG al identificar estos posibles valores de ataque los transforma en valores seguros.
+		w.Header().Set("X-XSS-Protection", "0")
+		function(w, r)
+	}
+}
  
-var templates string // package scoped var to hold templates path
  
-// parses the form values into our custom structure.
+// Maneja las peticiones solicitadas en  / 
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	// Parsea la plantilla root.html 
+	if t, err := template.ParseFiles(filepath.Join(templates, "root.html")); err != nil {
+		// Se ha presentado un error
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		// retorna la respuesta al cliente por medio de t.Execute
+		t.Execute(w, nil)
+	}
+}
+
+// Maneja las peticiones solicitadas en  /display 
+func postHandler(w http.ResponseWriter, r *http.Request) {
+	// Parsea la plantilla root.html  con los valores ingresdos por el usuario
+	if t, err := template.ParseFiles(filepath.Join(templates, "form_results.html")); err != nil {
+	    // Se ha presentado un error
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	} else {
+		// se asegura que el parseo de los datos del  formulario son correcto, este m-todo es valido para 
+		// peticiones POST o PUT
+		// Documentacion del m-todo: http://golang.org/pkg/net/http/#Request.ParseForm
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Error parsing form values!", http.StatusInternalServerError)
+			return
+		}
+		// Se obtiene los valores del formulario
+		userInput, err := getFormValues(&r.Form)
+		if err != nil {
+		    // Se ha presentado un error
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// Go implicitamente injecta los valores del usuario en el contexto, es decir en el template form_results.html.
+		t.Execute(w, userInput)
+	}
+}
+
+// Parcea los valores del formulario en una estructura personalizada
 func getFormValues(userInput *url.Values) (contextInput *UserContextInput, err error) {
-	// create a new UserContextInput struct to hold user input
+	// crea una nueva estrucutura UserContextInput para mantener los valores ingresados por el usuario
 	contextInput = new(UserContextInput)
  
-	// iterate over the form values assigning each one to our struct.
+	//  itera sobre cada uno de los valores asignados al formulario para asignarlos a la estrucutura UserContextInput(contextInput)
 	for key, value := range *userInput {
 		switch key {
 		case "tag":
@@ -46,65 +117,8 @@ func getFormValues(userInput *url.Values) (contextInput *UserContextInput, err e
 		case "attr_src":
 			contextInput.AttributeSrc = value[0]
 		default:
-			return nil, fmt.Errorf("Unknown value passed in form!") // no funny business.
+			return nil, fmt.Errorf("El formulario contiene valores desconocidos!") 
 		}
 	}
-	return contextInput, nil // yes, it is safe to return a pointer in Go
-}
- 
-// !!!　注意 DO NOT DO THIS (Disables XSS protection in IE/Chrome) 注意　!!!
-func disableXSSProtection(function func(http.ResponseWriter, 
-                          *http.Request)) func(http.ResponseWriter, *http.Request) {
-        // return a closure wrapping our response with our header added
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-XSS-Protection", "0")
-		function(w, r)
-	}
-}
- 
-// our function to map handlers to URLs, also sets package var for our template path.
-func ServerFunc(dir string) (err error) {
-	templates = dir
- 
-	if _, err := os.Stat(templates); err != nil {
-		return fmt.Errorf("templates path is incorrect!")
-	}
-	// map / to our rootHandler
-	http.HandleFunc("/", disableXSSProtection(rootHandler))
-	// map /display to our postHandler
-	http.HandleFunc("/display", disableXSSProtection(postHandler))
-	return nil
-}
- 
-// handles everything in / except what is mapped in ServerFunc.
-func rootHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse our root.html template
-	if t, err := template.ParseFiles(filepath.Join(templates, "root.html")); err != nil {
-		// Something gnarly happened.
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else {
-		// return to client via t.Execute
-		t.Execute(w, nil)
-	}
-}
- 
-func postHandler(w http.ResponseWriter, r *http.Request) {
-	// parse our form results page which injects user input.
-	if t, err := template.ParseFiles(filepath.Join(templates, "form_results.html")); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	} else {
-		// make sure they parse correctly
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "Error parsing form values!", http.StatusInternalServerError)
-			return
-		}
-		// get the form values
-		userInput, err := getFormValues(&r.Form)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// inject user input with our implicit context aware encoding thanks to Go.
-		t.Execute(w, userInput)
-	}
+	return contextInput, nil //Es seguro retorna un puntero en GO.
 }

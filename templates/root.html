@@ -2,17 +2,19 @@
 <head>
 	<title>Go Template Examples</title>
 	<script>
+	// Registra un evento a un objetivo en especifico, en este caso cuando sucede el load de la pagina es decir cuando termina de ejecutarse de cargarse por completo la 
+	// pagina
 	window.addEventListener("load", function () {
+        // Se obtiene el button de submit
 		var submitter = document.getElementById("submit");
+		// se le adiciona un evento de click al boton de submit;el evento cumple la funcion del captirar el formulario con nombre boop y darle submit.
 		submitter.addEventListener("click", function() {
 			var form = document.getElementById("boop");
 			form.submit();
 		});
 	});
 	</script>
-	<style>
-	background: #808080 
-	</style>
+	<style>	background: #808080 </style>
 </head>
 <body>
 	<form id="boop" method="POST" action="/display">
